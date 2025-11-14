@@ -16,8 +16,9 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { authService } from '../services/authService';
-import patientService from '../services/patientService';
+import patientService from '../services/patientService'; // Mantido para possível uso externo
 import appointmentService from '../services/appointmentService';
+import { useDataContext } from '../context/DataContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Loader from '../components/Loader';
@@ -35,23 +36,26 @@ const Dashboard = () => {
     thisMonthSessions: 0,
   });
 
+  const { patients, refreshPatients } = useDataContext();
+
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
     setUser(currentUser);
     loadDashboardData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [patients, appointments] = await Promise.all([
-        patientService.getAll(),
-        appointmentService.getAll(),
-      ]);
+      // Atualiza lista de pacientes via contexto (mantém integração única)
+      await refreshPatients();
+      const appointments = await appointmentService.getAll();
+      const aptArray = Array.isArray(appointments) ? appointments : (appointments?.data || []);
 
       // Filtrar sessões futuras e ordenar por data
       const now = new Date();
-      const futureAppointments = appointments
+      const futureAppointments = aptArray
         .filter(apt => new Date(apt.appointmentDate) >= now)
         .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate));
 
@@ -62,19 +66,19 @@ const Dashboard = () => {
         : 'Nenhuma sessão agendada';
 
       // Sessões completadas
-      const completedCount = appointments.filter(
+      const completedCount = aptArray.filter(
         apt => apt.status === 'completed'
       ).length;
 
       // Sessões pendentes
-      const pendingCount = appointments.filter(
+      const pendingCount = aptArray.filter(
         apt => apt.status === 'scheduled' || apt.status === 'confirmed'
       ).length;
 
       // Sessões deste mês
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
-      const thisMonthCount = appointments.filter(apt => {
+      const thisMonthCount = aptArray.filter(apt => {
         const aptDate = new Date(apt.appointmentDate);
         return aptDate.getMonth() === currentMonth && aptDate.getFullYear() === currentYear;
       }).length;
