@@ -19,6 +19,7 @@ const AgendaPage = () => {
   const { appointmentsByMonth, patients, refreshPatients, refreshAppointmentsForMonth, createAppointment, updateAppointment, cancelAppointment } = useDataContext();
   const [appointments, setAppointments] = useState([]); // Local filtrado por data
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
@@ -59,6 +60,19 @@ const AgendaPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validação explícita
+    if (!formData.patient) {
+      showToast('Por favor, selecione um paciente', 'error');
+      return;
+    }
+    
+    if (!formData.date || !formData.time || !formData.duration) {
+      showToast('Por favor, preencha todos os campos obrigatórios', 'error');
+      return;
+    }
+    
+    setSubmitting(true);
     try {
       const currentUser = authService.getCurrentUser();
       
@@ -84,21 +98,32 @@ const AgendaPage = () => {
         price: 150 // Preço padrão de consulta
       };
 
+      console.log('📤 Enviando dados da sessão:', submitData);
+
       const year = selectedDate.getFullYear();
       const month = selectedDate.getMonth() + 1;
+      
+      let result;
       if (editingAppointment) {
-        await updateAppointment(editingAppointment._id, submitData, year, month);
+        result = await updateAppointment(editingAppointment._id, submitData, year, month);
+        console.log('✅ Sessão atualizada:', result);
         showToast('Sessão atualizada com sucesso!', 'success');
       } else {
-        await createAppointment(submitData, year, month);
+        result = await createAppointment(submitData, year, month);
+        console.log('✅ Sessão criada:', result);
         showToast('Sessão agendada com sucesso!', 'success');
       }
+      
       setShowModal(false);
       resetForm();
       await loadData();
     } catch (error) {
-      console.error('Erro ao salvar sessão:', error);
-      showToast(error.response?.data?.message || 'Erro ao salvar sessão', 'error');
+      console.error('❌ Erro ao salvar sessão:', error);
+      console.error('Detalhes do erro:', error.response?.data);
+      const errorMsg = error.response?.data?.message || error.message || 'Erro ao salvar sessão';
+      showToast(errorMsg, 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -205,9 +230,10 @@ const AgendaPage = () => {
             </h1>
             <p className="text-text-secondary">Gerencie seus compromissos e sessões</p>
           </div>
-          <Button onClick={() => {
+          <Button onClick={async () => {
             resetForm();
             setShowModal(true);
+            await refreshPatients(); // Garantir lista atualizada
           }}>
             <Plus size={20} />
             Nova Sessão
@@ -518,8 +544,8 @@ const AgendaPage = () => {
             >
               Cancelar
             </Button>
-            <Button type="submit" fullWidth>
-              {editingAppointment ? 'Atualizar' : 'Agendar'}
+            <Button type="submit" fullWidth disabled={submitting}>
+              {submitting ? 'Salvando...' : (editingAppointment ? 'Atualizar' : 'Agendar')}
             </Button>
           </div>
         </form>
