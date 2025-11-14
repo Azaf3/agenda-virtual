@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import AgendaPage from './pages/AgendaPage';
 import PacientesPage from './pages/PacientesPage';
 import ConfiguracoesPage from './pages/ConfiguracoesPage';
+import { DataProvider } from './context/DataContext';
 
 // Componente para rotas protegidas
 const ProtectedRoute = ({ children }) => {
@@ -34,8 +35,9 @@ const PublicRoute = ({ children }) => {
 function App() {
   return (
     <ToastProvider>
-      <Router>
-        <Routes>
+      <DataProvider>
+        <Router>
+          <Routes>
         {/* Rotas públicas */}
         <Route path="/" element={<LandingPage />} />
         <Route
@@ -91,8 +93,9 @@ function App() {
 
         {/* Rota padrão */}
         <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
+          </Routes>
+        </Router>
+      </DataProvider>
     </ToastProvider>
   );
 }

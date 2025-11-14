@@ -118,6 +118,16 @@ const Dashboard = () => {
     { day: 'Sex', horas: 8 },
   ];
 
+  // Nome formatado: Primeiro nome + inicial do último sobrenome (ex: "Israel A.")
+  const displayName = (() => {
+    const fullName = (user?.name || '').trim();
+    if (!fullName) return '';
+    const parts = fullName.split(/\s+/);
+    const first = parts[0];
+    const lastInitial = parts.length > 1 ? `${parts[parts.length - 1][0].toUpperCase()}.` : '';
+    return [first, lastInitial].filter(Boolean).join(' ');
+  })();
+
   const handleLogout = () => {
     authService.logout();
     navigate('/login');
@@ -216,7 +226,7 @@ const Dashboard = () => {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-4xl font-orbitron font-bold mb-2 bg-gradient-primary bg-clip-text text-transparent">
-              Bem-vindo, Dr(a). {user?.name?.split(' ')[0]}! 👋
+              Bem-vindo, {displayName}!
             </h1>
             <p className="text-text-secondary text-lg">
               Gerencie seus atendimentos e pacientes

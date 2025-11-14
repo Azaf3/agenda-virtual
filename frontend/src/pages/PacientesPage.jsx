@@ -9,13 +9,14 @@ import PatientHistoryModal from '../components/PatientHistoryModal';
 import Loader from '../components/Loader';
 import { useToast } from '../components/Toast';
 import patientService from '../services/patientService';
+import { useDataContext } from '../context/DataContext';
 
 const PacientesPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [patients, setPatients] = useState([]);
+  const { patients, refreshPatients } = useDataContext();
   const [loading, setLoading] = useState(true);
   const [editingPatient, setEditingPatient] = useState(null);
   const [selectMode, setSelectMode] = useState(false);
@@ -38,27 +39,12 @@ const PacientesPage = () => {
 
   // Carregar pacientes do backend
   useEffect(() => {
-    loadPatients();
-  }, []);
-
-  const loadPatients = async (silent = false) => {
-    try {
-      if (!silent) setLoading(true);
-      const data = await patientService.getAll();
-      setPatients(prev => {
-        // Evita sobrescrever otimizações recentes: faz merge por _id
-        const byId = new Map();
-        prev.forEach(p => byId.set(p._id, p));
-        data.forEach(p => byId.set(p._id, p));
-        return Array.from(byId.values());
-      });
-    } catch (error) {
-      console.error('Erro ao carregar pacientes:', error);
-      showToast('Erro ao carregar pacientes', 'error');
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
+    (async () => {
+      setLoading(true);
+      await refreshPatients();
+      setLoading(false);
+    })();
+  }, [refreshPatients]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -73,15 +59,13 @@ const PacientesPage = () => {
     try {
       if (editingPatient) {
         // Atualizar paciente existente
-        const updated = await patientService.update(editingPatient._id, formData);
-        setPatients(prev => prev.map(p => (p._id === editingPatient._id ? updated : p)));
-        await loadPatients(true);
+        await patientService.update(editingPatient._id, formData);
+        await refreshPatients();
         showToast('Paciente atualizado com sucesso!', 'success');
       } else {
         // Criar novo paciente
-        const created = await patientService.create(formData);
-        setPatients(prev => [created, ...prev]);
-        await loadPatients(true);
+        await patientService.create(formData);
+        await refreshPatients();
         showToast('Paciente cadastrado com sucesso!', 'success');
       }
       setShowModal(false);
@@ -100,8 +84,7 @@ const PacientesPage = () => {
     if (window.confirm(`Tem certeza que deseja excluir ${patient.name}?`)) {
       try {
         await patientService.delete(patient._id);
-        setPatients(prev => prev.filter(p => p._id !== patient._id));
-        await loadPatients(true);
+        await refreshPatients();
         showToast('Paciente excluído com sucesso!', 'success');
       } catch (error) {
         console.error('Erro ao excluir paciente:', error);
@@ -192,8 +175,7 @@ const PacientesPage = () => {
     if (!window.confirm(`Excluir ${selectedIds.length} paciente(s)?`)) return;
     try {
       await patientService.bulkDelete(selectedIds);
-      setPatients(prev => prev.filter(p => !selectedIds.includes(p._id)));
-      await loadPatients(true);
+      await refreshPatients();
       showToast('Pacientes excluídos com sucesso!', 'success');
       setSelectedIds([]);
       setSelectMode(false);

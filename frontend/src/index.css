@@ -9,7 +9,9 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
+  color-scheme: light;
+  background-color: #FFFFFF;
+  color: #1F2937;
   
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -27,6 +29,8 @@ body {
   margin: 0;
   min-height: 100vh;
   overflow-x: hidden;
+  background-color: #FFFFFF;
+  color: #1F2937;
 }
 
 @layer components {

@@ -7,16 +7,17 @@ import Modal from '../components/Modal';
 import Input from '../components/Input';
 import Loader from '../components/Loader';
 import { useToast } from '../components/Toast';
-import appointmentService from '../services/appointmentService';
-import patientService from '../services/patientService';
+import appointmentService from '../services/appointmentService'; // Mantido para compat, mas funções vêm do contexto
+import patientService from '../services/patientService'; // Mantido para compat se usado em outros pontos
+import { useDataContext } from '../context/DataContext';
 import authService from '../services/authService';
 
 const AgendaPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState('week'); // 'day', 'week', 'month'
-  const [appointments, setAppointments] = useState([]);
-  const [patients, setPatients] = useState([]);
+  const { appointmentsByMonth, patients, refreshPatients, refreshAppointmentsForMonth, createAppointment, updateAppointment, cancelAppointment } = useDataContext();
+  const [appointments, setAppointments] = useState([]); // Local filtrado por data
   const [loading, setLoading] = useState(true);
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,18 +44,19 @@ const AgendaPage = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [appointmentsData, patientsData] = await Promise.all([
-        appointmentService.getByMonth(
-          selectedDate.getFullYear(),
-          selectedDate.getMonth() + 1
-        ),
-        patientService.getAll()
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth() + 1;
+      await Promise.all([
+        refreshPatients(),
+        refreshAppointmentsForMonth(year, month)
       ]);
-      setAppointments(appointmentsData);
-      setPatients(patientsData);
+      const key = `${year}-${String(month).padStart(2, '0')}`;
+      const base = appointmentsByMonth[key] || [];
+      // Filtra apenas do dia selecionado após sincronização
+      setAppointments(base);
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      showToast('Erro ao carregar dados', 'error');
+      console.error('Erro ao sincronizar agenda:', error);
+      setAppointments([]);
     } finally {
       setLoading(false);
     }
@@ -87,17 +89,18 @@ const AgendaPage = () => {
         price: 150 // Preço padrão de consulta
       };
 
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth() + 1;
       if (editingAppointment) {
-        await appointmentService.update(editingAppointment._id, submitData);
+        await updateAppointment(editingAppointment._id, submitData, year, month);
         showToast('Sessão atualizada com sucesso!', 'success');
       } else {
-        await appointmentService.create(submitData);
+        await createAppointment(submitData, year, month);
         showToast('Sessão agendada com sucesso!', 'success');
       }
-      
       setShowModal(false);
       resetForm();
-      loadData();
+      await loadData();
     } catch (error) {
       console.error('Erro ao salvar sessão:', error);
       showToast(error.response?.data?.message || 'Erro ao salvar sessão', 'error');
@@ -107,9 +110,11 @@ const AgendaPage = () => {
   const handleCancel = async (appointment) => {
     if (window.confirm('Tem certeza que deseja cancelar esta sessão?')) {
       try {
-        await appointmentService.cancel(appointment._id);
+        const year = selectedDate.getFullYear();
+        const month = selectedDate.getMonth() + 1;
+        await cancelAppointment(appointment._id, year, month);
         showToast('Sessão cancelada com sucesso!', 'success');
-        loadData();
+        await loadData();
       } catch (error) {
         console.error('Erro ao cancelar sessão:', error);
         showToast('Erro ao cancelar sessão', 'error');
@@ -157,10 +162,10 @@ const AgendaPage = () => {
 
   const getAppointmentColor = (status) => {
     switch (status) {
-      case 'confirmado': return 'bg-green-500/20 border-green-500/50 text-green-400';
-      case 'pendente': return 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400';
-      case 'cancelado': return 'bg-red-500/20 border-red-500/50 text-red-400';
-      default: return 'bg-primary-500/20 border-primary-500/50 text-primary-400';
+      case 'confirmado': return 'bg-green-50 border-green-300 text-green-700';
+      case 'pendente': return 'bg-yellow-50 border-yellow-300 text-yellow-700';
+      case 'cancelado': return 'bg-red-50 border-red-300 text-red-700';
+      default: return 'bg-primary-50 border-primary-300 text-primary-700';
     }
   };
 
@@ -184,14 +189,14 @@ const AgendaPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-900 via-secondary-900 to-dark-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-900 via-secondary-900 to-dark-50 p-8">
+    <div className="min-h-screen bg-background p-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -200,10 +205,10 @@ const AgendaPage = () => {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-4xl font-orbitron font-bold text-white mb-2">
+            <h1 className="text-4xl font-orbitron font-bold text-text mb-2">
               Minha Agenda
             </h1>
-            <p className="text-gray-400">Gerencie seus compromissos e sessões</p>
+            <p className="text-text-secondary">Gerencie seus compromissos e sessões</p>
           </div>
           <Button onClick={() => {
             resetForm();
@@ -220,16 +225,16 @@ const AgendaPage = () => {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setSelectedDate(new Date(selectedDate.setMonth(selectedDate.getMonth() - 1)))}
-                className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <ChevronLeft className="text-white" size={20} />
+                <ChevronLeft className="text-text" size={20} />
               </button>
-              <h2 className="text-xl font-bold text-white capitalize">{currentMonth}</h2>
+              <h2 className="text-xl font-bold text-text capitalize">{currentMonth}</h2>
               <button
                 onClick={() => setSelectedDate(new Date(selectedDate.setMonth(selectedDate.getMonth() + 1)))}
-                className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <ChevronRight className="text-white" size={20} />
+                <ChevronRight className="text-text" size={20} />
               </button>
             </div>
 
@@ -241,7 +246,7 @@ const AgendaPage = () => {
                   className={`px-4 py-2 rounded-lg transition-colors ${
                     viewMode === ['day', 'week', 'month'][idx]
                       ? 'bg-gradient-primary text-white'
-                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                      : 'bg-gray-100 text-text-secondary hover:bg-gray-200'
                   }`}
                 >
                   {mode}
@@ -255,11 +260,11 @@ const AgendaPage = () => {
         <div className="grid lg:grid-cols-4 gap-6">
           {/* Calendário Lateral */}
           <Card className="lg:col-span-1">
-            <h3 className="text-lg font-bold text-white mb-4">Calendário</h3>
+            <h3 className="text-lg font-bold text-text mb-4">Calendário</h3>
             <div className="space-y-2">
               <div className="grid grid-cols-7 gap-1 text-center mb-2">
                 {weekDays.map((day) => (
-                  <div key={day} className="text-xs text-gray-400 font-semibold">
+                  <div key={day} className="text-xs text-text-secondary font-semibold">
                     {day}
                   </div>
                 ))}
@@ -271,7 +276,7 @@ const AgendaPage = () => {
                     className={`aspect-square flex items-center justify-center rounded-lg text-sm transition-colors ${
                       i === 5
                         ? 'bg-gradient-primary text-white'
-                        : 'hover:bg-white/5 text-gray-400'
+                        : 'hover:bg-gray-100 text-text-secondary'
                     }`}
                   >
                     {i + 1}
@@ -281,18 +286,18 @@ const AgendaPage = () => {
             </div>
 
             <div className="mt-6 space-y-2">
-              <h3 className="text-sm font-bold text-white mb-3">Legenda</h3>
+              <h3 className="text-sm font-bold text-text mb-3">Legenda</h3>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-gray-400">Confirmado</span>
+                <span className="text-sm text-text-secondary">Confirmado</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                <span className="text-sm text-gray-400">Pendente</span>
+                <span className="text-sm text-text-secondary">Pendente</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <span className="text-sm text-gray-400">Cancelado</span>
+                <span className="text-sm text-text-secondary">Cancelado</span>
               </div>
             </div>
           </Card>
@@ -300,10 +305,10 @@ const AgendaPage = () => {
           {/* Lista de Compromissos */}
           <div className="lg:col-span-3 space-y-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-white">
+              <h3 className="text-xl font-bold text-text">
                 Compromissos de {selectedDate.toLocaleDateString('pt-BR')}
               </h3>
-              <span className="text-gray-400 text-sm">
+              <span className="text-text-secondary text-sm">
                 {todayAppointments.length} {todayAppointments.length === 1 ? 'sessão' : 'sessões'}
               </span>
             </div>
@@ -317,15 +322,15 @@ const AgendaPage = () => {
                     placeholder="Buscar paciente..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2 pl-10 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primary-500 transition-colors"
+                    className="w-full px-4 py-2 pl-10 bg-white border border-gray-300 rounded-lg text-text placeholder-text-secondary focus:outline-none focus:border-primary-500 transition-colors"
                   />
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
                 </div>
                 <div className="flex gap-2">
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary-500 transition-colors"
+                    className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-text focus:outline-none focus:border-primary-500 transition-colors"
                   >
                     <option value="todos">Todos</option>
                     <option value="confirmado">Confirmado</option>
@@ -342,16 +347,16 @@ const AgendaPage = () => {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 whileHover={{ scale: 1.02 }}
-                className={`p-4 rounded-xl border backdrop-blur-lg ${getAppointmentColor(appointment.status)}`}
+                className={`p-4 rounded-xl border ${getAppointmentColor(appointment.status)}`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center border border-white/10">
-                      <User className="w-6 h-6 text-white" />
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-300">
+                      <User className="w-6 h-6 text-text" />
                     </div>
                     <div>
-                      <h4 className="text-lg font-bold text-white mb-1">
-                        {appointment.patient?.name || 'Paciente'}
+                      <h4 className="text-lg font-bold text-text mb-1">
+                        {appointment.patient?.name || 'Paciente removido'}
                       </h4>
                       <p className="text-sm opacity-80 mb-2">{appointment.type}</p>
                       <div className="flex items-center gap-4 text-sm">
@@ -389,8 +394,8 @@ const AgendaPage = () => {
 
             {todayAppointments.length === 0 && (
               <Card className="text-center py-12">
-                <Calendar className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400 text-lg">
+                <Calendar className="w-16 h-16 text-text-secondary mx-auto mb-4" />
+                <p className="text-text-secondary text-lg">
                   Nenhum compromisso para esta data
                 </p>
                 <Button className="mt-4" onClick={() => {
@@ -411,19 +416,19 @@ const AgendaPage = () => {
         setShowModal(false);
         resetForm();
       }}>
-        <h2 className="text-2xl font-bold text-white mb-6">
+        <h2 className="text-2xl font-bold text-text mb-6">
           {editingAppointment ? 'Editar Sessão' : 'Nova Sessão'}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
               Paciente *
             </label>
             <select
               name="patient"
               value={formData.patient}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary-500 transition-colors"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-text focus:outline-none focus:border-primary-500 transition-colors"
               required
             >
               <option value="">Selecione um paciente</option>
@@ -467,14 +472,14 @@ const AgendaPage = () => {
               required
             />
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
+              <label className="block text-sm font-medium text-text-secondary mb-2">
                 Status
               </label>
               <select
                 name="status"
                 value={formData.status}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary-500 transition-colors"
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-text focus:outline-none focus:border-primary-500 transition-colors"
               >
                 <option value="confirmado">Confirmado</option>
                 <option value="pendente">Pendente</option>
@@ -493,7 +498,7 @@ const AgendaPage = () => {
           />
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
               Observações
             </label>
             <textarea
@@ -502,7 +507,7 @@ const AgendaPage = () => {
               onChange={handleInputChange}
               rows="3"
               placeholder="Notas sobre a sessão..."
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primary-500 transition-colors resize-none"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-text placeholder-text-secondary focus:outline-none focus:border-primary-500 transition-colors resize-none"
             />
           </div>
 
