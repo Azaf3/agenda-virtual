@@ -46,14 +46,9 @@ const AgendaPage = () => {
       setLoading(true);
       const year = selectedDate.getFullYear();
       const month = selectedDate.getMonth() + 1;
-      await Promise.all([
-        refreshPatients(),
-        refreshAppointmentsForMonth(year, month)
-      ]);
-      const key = `${year}-${String(month).padStart(2, '0')}`;
-      const base = appointmentsByMonth[key] || [];
-      // Filtra apenas do dia selecionado após sincronização
-      setAppointments(base);
+      await refreshPatients();
+      const monthAppointments = await refreshAppointmentsForMonth(year, month);
+      setAppointments(monthAppointments);
     } catch (error) {
       console.error('Erro ao sincronizar agenda:', error);
       setAppointments([]);
