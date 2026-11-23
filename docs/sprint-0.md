@@ -2,7 +2,7 @@
 
 ## O que foi feito
 
-- Projeto novo do zero (React + Vite + TypeScript), substituindo o MentaliQ. O código antigo está na branch `legacy`.
+- Projeto novo do zero (React + Vite + TypeScript), substituindo o MentaliQ antigo.
 - Tema: fundo cinza claro, cor da marca ameixa (`#4f3a66`), fonte Figtree. Tokens em `src/index.css`.
 - Componentes base: botão (com estado de carregando), campo com rótulo e erro acessíveis, alerta de formulário.
 - Autenticação com Supabase: entrar, criar conta, recuperar senha por e-mail e criar senha nova pelo link.

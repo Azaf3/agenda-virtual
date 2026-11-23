@@ -3,7 +3,6 @@
 Agenda para clínicas e profissionais de saúde. O objetivo principal: **a secretária nunca consegue marcar dois pacientes no mesmo horário do mesmo profissional**, nem por engano, nem com duas pessoas clicando ao mesmo tempo.
 
 > Nome provisório. Para trocar, edite `src/config/app.ts`.
-> A versão antiga (MentaliQ, Express + MongoDB) está na branch `legacy`.
 
 ## Stack
 
