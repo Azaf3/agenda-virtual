@@ -1,0 +1,47 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/figtree';
+
+@theme {
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* Base */
+  --color-paper: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-ink: #1d2230;
+  --color-muted: #5e6676;
+  --color-line: #e2e5eb;
+
+  /* Marca: ameixa */
+  --color-brand: #4f3a66;
+  --color-brand-strong: #3d2c50;
+  --color-brand-soft: #efe8f5;
+  --color-brand-mid: #c9b6dc;
+
+  /* Status de atendimento */
+  --color-ok: #2d7a57;
+  --color-wait: #a86b12;
+  --color-miss: #b93a32;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-paper font-sans text-ink;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
